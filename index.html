@@ -118,6 +118,11 @@ html,body{height:100%;background:#060b1c;color:#dfe8ff;font-family:system-ui,-ap
 #upd-box.show{display:block}
 #upd-box .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 #toast{z-index:99}
+#angrow{flex:0 0 100%;display:flex;align-items:center;gap:10px;padding:0 6px 2px;font-size:.78rem;color:#9fb3d8}
+#angrow input{flex:1;accent-color:#6cf;height:28px}
+#angrow b{min-width:48px;text-align:right;color:#fff;font-size:.9rem}
+@media (orientation:landscape){ #gallery{bottom:118px!important} }
+@media (orientation:portrait){ #gallery{bottom:calc(112px + env(safe-area-inset-bottom))!important} }
 </style>
 </head>
 <body>
@@ -126,6 +131,7 @@ html,body{height:100%;background:#060b1c;color:#dfe8ff;font-family:system-ui,-ap
 <div id="info"></div>
 <div id="gallery"></div>
 <div id="bar">
+  <div id="angrow"><span>Кут</span><input type="range" id="b-ang" min="1" max="180" step="1" value="75" aria-label="Кут закручування"><b id="b-ang-v">75°</b></div>
   <button class="b" id="b-play">⏸</button>
   <button class="b" id="b-minus">−</button>
   <button class="b" id="b-plus">+</button>
@@ -156,7 +162,7 @@ html,body{height:100%;background:#060b1c;color:#dfe8ff;font-family:system-ui,-ap
   <div class="row"><label>Алгоритм</label><div class="seg" id="s-mode">
     <button class="b" data-v="turtle">🐢 Черепаха (як на відео)</button>
     <button class="b" data-v="copies">🌀 Обертання копій</button></div></div>
-  <div class="row"><label>Кут повороту</label><input type="range" id="s-angle" min="0.5" max="179.5" step="0.5"><span class="v" id="s-angle-v"></span></div>
+  <div class="row"><label>Кут повороту</label><input type="range" id="s-angle" min="1" max="180" step="1"><span class="v" id="s-angle-v"></span></div>
   <div class="row"><label>Зміна кута за цикл</label><div class="seg" id="s-da">
     <button class="b" data-v="0">стоп</button><button class="b" data-v="0.1">+0.1°</button><button class="b" data-v="0.5">+0.5°</button>
     <button class="b" data-v="1">+1°</button><button class="b" data-v="2">+2°</button><button class="b" data-v="5">+5°</button></div></div>
@@ -223,7 +229,7 @@ const APP_SRC=(()=>{ try{
 }catch(e){ return ""; } })();
 /* Адреса сайту програми. Порожньо = файл ще не прив'язаний. Заповнюється автоматично після публікації на GitHub */
 const BOUND_SITE=/*BOUND*/"https://86alieksandrkozlov86-create.github.io/zenway-spiral/";
-const APP_VER=1;   /* номер версії: якщо файл новіший за сайт — власнику пропонується оновити сайт */
+const APP_VER=2;   /* номер версії: якщо файл новіший за сайт — власнику пропонується оновити сайт */
 try{ document.getElementById("inst-title").textContent="ZenWay · Спіраль (v"+APP_VER+")"; document.title="ZenWay · Спіраль v"+APP_VER; }catch(e){}
 (()=>{
 "use strict";
@@ -236,7 +242,7 @@ try{ Object.assign(S,JSON.parse(localStorage.getItem("zenway_spiral_v1")||"{}"))
 const saveS=()=>{ try{ localStorage.setItem("zenway_spiral_v1",JSON.stringify(S)); }catch(e){} };
 let element=null;          /* {strokes:[[{x,y}]], stamp:bool} — нормалізований елемент */
 let drawn=[];              /* штрихи на екрані малювання (px) */
-let playing=true;
+let playing=true, drawOpen=true;
 
 /* ============ алгоритм (як на відео) ============
    Черепаха: крок i — це елемент, розтягнутий до довжини (i+1) і повернутий на напрям h;
@@ -304,7 +310,7 @@ function resize(){
 }
 function stageRect(){        /* вільна область для фігури (без галереї та панелі) */
   const g=$("gallery").getBoundingClientRect(), top=Math.min(90,H*.12);
-  if(innerWidth>innerHeight) return {x:0,y:top*.6,w:Math.max(100,g.left-10),h:H-70-top*.6};
+  if(innerWidth>innerHeight) return {x:0,y:top*.6,w:Math.max(100,g.left-10),h:H-118-top*.6};
   return {x:0,y:top,w:W,h:Math.max(100,g.top-top-6)};
 }
 function drawFig(ctx,fig,rect,progress,alpha,mixAll,lw){
@@ -395,14 +401,15 @@ function finishCurrent(now){
   th.classList.add("hidden"); th.scrollIntoView({block:"nearest"});
   flyers.push({fig,t0:now,from:rect,thumb:th});
   soundChime(fig.angle);
-  let a=S.angle+S.dA; if(a>=180) a-=179.5; if(a<.5) a=.5; S.angle=Math.round(a*100)/100; saveS();
+  let a=S.angle+S.dA; if(a>180) a-=180; if(a<1) a=1; S.angle=Math.round(a*100)/100; saveS();
   restartCycle();
 }
 function frame(now){
   requestAnimationFrame(frame);
   if(!element) return;
   const dt=now-lastNow; lastNow=now;
-  if(!playing){ curT0+=dt; flyers.forEach(f=>f.t0+=dt); }
+  if(!playing||drawOpen){ curT0+=dt; flyers.forEach(f=>f.t0+=dt); }
+  if(drawOpen) return;            /* екран малювання: симуляція й звук стоять */
   cx.clearRect(0,0,W,H);
   const bg=cx.createRadialGradient(W*.35,H*.4,0,W*.35,H*.4,Math.max(W,H)*.8);
   bg.addColorStop(0,"#0d1838"); bg.addColorStop(1,"#050a1a"); cx.fillStyle=bg; cx.fillRect(0,0,W,H);
@@ -429,6 +436,7 @@ function frame(now){
 }
 function updateLabels(){
   const a=cur?cur.angle:S.angle;
+  try{ $("b-ang").value=String(Math.round(a)); $("b-ang-v").textContent=(Number.isInteger(a)?a:a.toFixed(1))+"°"; }catch(e){}
   $("angle").textContent=(Number.isInteger(a)?a:a.toFixed(a*10%1?2:1))+"°";
   $("info").textContent=(S.mode==="turtle"?"🐢 черепаха":"🌀 копії")+" · "+S.N+" кроків"+(S.dA?" · +"+S.dA+"° за цикл":"");
 }
@@ -489,18 +497,19 @@ $("d-go").onclick=()=>{
   if(!e){ toast("Намалюй лінію або фігуру"); return; }
   element=e; try{ localStorage.setItem("zenway_spiral_el",JSON.stringify(e)); }catch(_){}
   gal.innerHTML=""; thumbs.clear(); flyers=[];
-  $("draw").classList.add("hide"); playing=true; $("b-play").textContent="⏸";
+  $("draw").classList.add("hide"); drawOpen=false; playing=true; $("b-play").textContent="⏸";
   audio(); restartCycle();
   if(e.stamp&&S.mode==="turtle") toast("Замкнена фігура — ставлю її «штампом» на кожному кроці");
 };
-$("b-draw").onclick=()=>{ $("draw").classList.remove("hide"); soundStop(); requestAnimationFrame(dResize); };
+$("b-draw").onclick=()=>{ drawOpen=true; $("draw").classList.remove("hide"); soundStop(); try{ if(ac) ac.suspend(); }catch(e){} requestAnimationFrame(dResize); };
 
 /* ============ кнопки та налаштування ============ */
 function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("show"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("show"),2400); }
 $("b-play").onclick=()=>{ playing=!playing; $("b-play").textContent=playing?"⏸":"▶"; if(!playing) soundStop(); };
-const nudge=d=>{ let a=Math.round((S.angle+d)*100)/100; if(a<.5) a=.5; if(a>179.5) a=179.5; S.angle=a; saveS(); restartCycle(); syncSet(); };
-$("b-minus").onclick=()=>nudge(-(S.dA||1));
-$("b-plus").onclick=()=>nudge(S.dA||1);
+const nudge=d=>{ let a=Math.round((S.angle+d)*100)/100; if(a<1) a=1; if(a>180) a=180; S.angle=a; saveS(); restartCycle(); syncSet(); };
+$("b-minus").onclick=()=>nudge(-1);
+$("b-plus").onclick=()=>nudge(1);
+$("b-ang").oninput=e=>{ S.angle=+e.target.value; $("b-ang-v").textContent=S.angle+"°"; saveS(); restartCycle(); };
 $("b-set").onclick=()=>{ syncSet(); $("set").classList.add("show"); };
 $("s-close").onclick=()=>$("set").classList.remove("show");
 $("b-snd").onclick=()=>{ S.snd=!S.snd; saveS(); if(!S.snd) soundStop(); else audio(); syncSet(); };
